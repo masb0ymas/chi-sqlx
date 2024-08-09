@@ -1,11 +1,12 @@
 package database
 
 import (
-	"chi-sqlx/src/config"
+	"chi-sqlx/config"
 	"fmt"
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type Database struct {

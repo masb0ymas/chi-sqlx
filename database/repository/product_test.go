@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"chi-sqlx/src/database/entity"
+	"chi-sqlx/database/entity"
 	"context"
 	"fmt"
 	"testing"
@@ -42,7 +42,7 @@ func TestCreateProduct(t *testing.T) {
 		{
 			name: "success",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").
+				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
 					WillReturnResult(sqlmock.NewResult(1, 1))
 
 				record, err := repo.CreateProduct(context.Background(), p)
@@ -56,8 +56,8 @@ func TestCreateProduct(t *testing.T) {
 		{
 			name: "failed inserting product",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").
-					WillReturnError(fmt.Errorf("error inserting product"))
+				mock.ExpectPrepare("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
+					ExpectExec().WillReturnError(fmt.Errorf("error inserting product"))
 
 				_, err := repo.CreateProduct(context.Background(), p)
 				require.Error(t, err)
@@ -69,8 +69,8 @@ func TestCreateProduct(t *testing.T) {
 		{
 			name: "failed getting last insert ID",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").
-					WillReturnResult(sqlmock.NewErrorResult(fmt.Errorf("error getting last insert ID")))
+				mock.ExpectPrepare("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
+					ExpectExec().WillReturnResult(sqlmock.NewErrorResult(fmt.Errorf("error getting last insert ID")))
 
 				_, err := repo.CreateProduct(context.Background(), p)
 				require.Error(t, err)
@@ -112,7 +112,7 @@ func TestGetProduct(t *testing.T) {
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{"id", "name", "image", "category", "description", "rating", "num_reviews", "price", "count_in_stock", "created_at", "updated_at", "deleted_at"}).
 					AddRow(1, p.Name, p.Image, p.Category, p.Description, p.Rating, p.NumReviews, p.Price, p.CountInStock, p.CreatedAt, p.UpdatedAt, p.DeletedAt)
-				mock.ExpectQuery("SELECT * FROM product WHERE id=?").WithArgs(1).WillReturnRows(rows)
+				mock.ExpectQuery("SELECT * FROM product WHERE id=$1").WithArgs(1).WillReturnRows(rows)
 
 				record, err := repo.GetProduct(context.Background(), 1)
 				require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestGetProduct(t *testing.T) {
 		{
 			name: "failed getting product",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT * FROM product WHERE id=?").WithArgs(1).WillReturnError(fmt.Errorf("error getting product"))
+				mock.ExpectQuery("SELECT * FROM product WHERE id=$1").WithArgs(1).WillReturnError(fmt.Errorf("error getting product"))
 
 				_, err := repo.GetProduct(context.Background(), 1)
 				require.Error(t, err)
@@ -233,7 +233,7 @@ func TestUpdateProduct(t *testing.T) {
 		{
 			name: "success",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").
+				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
 					WillReturnResult(sqlmock.NewResult(1, 1))
 
 				cp, err := repo.CreateProduct(context.Background(), p)

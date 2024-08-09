@@ -1,9 +1,10 @@
 package repository
 
 import (
-	"chi-sqlx/src/database/entity"
+	"chi-sqlx/database/entity"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -18,18 +19,35 @@ func NewProductRepository(db *sqlx.DB) *ProductRepository {
 	}
 }
 
+const insertProduct = `
+	INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) 
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	RETURNING id, created_at, updated_at
+`
+
 func (repo *ProductRepository) CreateProduct(ctx context.Context, p *entity.Product) (*entity.Product, error) {
-	res, err := repo.db.NamedExecContext(ctx, "INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (:name, :image, :category, :description, :rating, :num_reviews, :price, :count_in_stock)", p)
+	var lastInsertID int64
+	var createdAt time.Time
+	var updatedAt time.Time
+
+	err := repo.db.QueryRowContext(ctx, insertProduct,
+		p.Name,
+		p.Image,
+		p.Category,
+		p.Description,
+		p.Rating,
+		p.NumReviews,
+		p.Price,
+		p.CountInStock).
+		Scan(&lastInsertID, &createdAt, &updatedAt)
+
 	if err != nil {
-		return nil, fmt.Errorf("error inserting product: %v", err)
+		return nil, fmt.Errorf("error inserting product: %w", err)
 	}
 
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("error getting last insert ID: %v", err)
-	}
-
-	p.ID = id
+	p.ID = lastInsertID
+	p.CreatedAt = createdAt
+	p.UpdatedAt = updatedAt
 
 	return p, nil
 }
@@ -37,7 +55,7 @@ func (repo *ProductRepository) CreateProduct(ctx context.Context, p *entity.Prod
 func (repo *ProductRepository) GetProduct(ctx context.Context, id int64) (*entity.Product, error) {
 	var p entity.Product
 
-	err := repo.db.GetContext(ctx, &p, "SELECT * FROM product WHERE id=?", id)
+	err := repo.db.GetContext(ctx, &p, "SELECT * FROM product WHERE id=$1", id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting product: %v", err)
 	}
@@ -45,8 +63,8 @@ func (repo *ProductRepository) GetProduct(ctx context.Context, id int64) (*entit
 	return &p, nil
 }
 
-func (repo *ProductRepository) ListProducts(ctx context.Context) ([]*entity.Product, error) {
-	var products []*entity.Product
+func (repo *ProductRepository) ListProducts(ctx context.Context) ([]entity.Product, error) {
+	var products []entity.Product
 
 	err := repo.db.SelectContext(ctx, &products, "SELECT * FROM product")
 	if err != nil {

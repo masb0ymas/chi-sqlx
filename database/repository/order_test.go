@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"chi-sqlx/src/database/entity"
+	"chi-sqlx/database/entity"
 	"context"
 	"fmt"
 	"testing"

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"chi-sqlx/src/config"
-	"chi-sqlx/src/database"
+	"chi-sqlx/config"
+	"chi-sqlx/database"
+	"chi-sqlx/routes"
 	"log"
 )
 
@@ -15,4 +16,7 @@ func main() {
 	}
 	defer db.Close()
 	log.Printf("successfully connected to database %v", dbname)
+
+	// register routes
+	routes.RegisterRoutes(db.GetDB())
 }
