@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
@@ -14,7 +15,7 @@ import (
 func withTestDB(t *testing.T, fn func(*sqlx.DB, sqlmock.Sqlmock)) {
 	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
-		t.Fatalf("error creating mock database: %v", err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer mockDB.Close()
 
@@ -42,12 +43,22 @@ func TestCreateProduct(t *testing.T) {
 		{
 			name: "success",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
-					WillReturnResult(sqlmock.NewResult(1, 1))
+				// Mock the expected query and result
+				expectedID := int64(1)
+				expectedCreatedAt := time.Now()
+				expectedUpdatedAt := time.Now()
+
+				mock.ExpectQuery("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at").
+					WithArgs(p.Name, p.Image, p.Category, p.Description, p.Rating, p.NumReviews, p.Price, p.CountInStock).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
+						AddRow(expectedID, expectedCreatedAt, expectedUpdatedAt))
 
 				record, err := repo.CreateProduct(context.Background(), p)
 				require.NoError(t, err)
-				require.Equal(t, int64(1), record.ID)
+				require.NotNil(t, record)
+				require.Equal(t, expectedID, record.ID)
+				require.Equal(t, expectedCreatedAt, record.CreatedAt)
+				require.Equal(t, expectedUpdatedAt, record.UpdatedAt)
 
 				err = mock.ExpectationsWereMet()
 				require.NoError(t, err)
@@ -56,21 +67,9 @@ func TestCreateProduct(t *testing.T) {
 		{
 			name: "failed inserting product",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectPrepare("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
-					ExpectExec().WillReturnError(fmt.Errorf("error inserting product"))
-
-				_, err := repo.CreateProduct(context.Background(), p)
-				require.Error(t, err)
-
-				err = mock.ExpectationsWereMet()
-				require.NoError(t, err)
-			},
-		},
-		{
-			name: "failed getting last insert ID",
-			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectPrepare("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
-					ExpectExec().WillReturnResult(sqlmock.NewErrorResult(fmt.Errorf("error getting last insert ID")))
+				mock.ExpectQuery("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at").
+					WithArgs(p.Name, p.Image, p.Category, p.Description, p.Rating, p.NumReviews, p.Price, p.CountInStock).
+					WillReturnError(fmt.Errorf("error inserting product"))
 
 				_, err := repo.CreateProduct(context.Background(), p)
 				require.Error(t, err)
@@ -233,12 +232,21 @@ func TestUpdateProduct(t *testing.T) {
 		{
 			name: "success",
 			test: func(t *testing.T, repo *ProductRepository, mock sqlmock.Sqlmock) {
-				mock.ExpectExec("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").
-					WillReturnResult(sqlmock.NewResult(1, 1))
+				// Mock the expected query and result
+				expectedID := int64(1)
+				expectedCreatedAt := time.Now()
+				expectedUpdatedAt := time.Now()
+
+				mock.ExpectQuery("INSERT INTO product (name, image, category, description, rating, num_reviews, price, count_in_stock) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at").
+					WithArgs(p.Name, p.Image, p.Category, p.Description, p.Rating, p.NumReviews, p.Price, p.CountInStock).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
+						AddRow(expectedID, expectedCreatedAt, expectedUpdatedAt))
 
 				cp, err := repo.CreateProduct(context.Background(), p)
 				require.NoError(t, err)
-				require.Equal(t, int64(1), cp.ID)
+				require.Equal(t, expectedID, cp.ID)
+				require.Equal(t, expectedCreatedAt, cp.CreatedAt)
+				require.Equal(t, expectedUpdatedAt, cp.UpdatedAt)
 
 				mock.ExpectExec("UPDATE product SET name=?, image=?, category=?, description=?, rating=?, num_reviews=?, price=?, count_in_stock=?, updated_at=? WHERE id=?").
 					WillReturnResult(sqlmock.NewResult(1, 1))
